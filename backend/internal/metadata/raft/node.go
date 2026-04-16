@@ -1,6 +1,7 @@
 package raft
 
 import (
+	statemachine "cloud-storage/internal/metadata/state_machine"
 	"sync"
 	"time"
 )
@@ -25,8 +26,21 @@ type RaftNode struct {
 
 	electionResetEvent time.Time
 	voteCount int
+	stateMachine *statemachine.StateMachine
 }
 
+
+func NewRaftNode(id string, peers []string) *RaftNode {
+	return &RaftNode{
+		id: id,
+		peers: peers,
+		state: Follower,
+		log: []LogEntry{},
+		nextIndex: make(map[string]int),
+		matchIndex: make(map[string]int),
+		stateMachine: statemachine.NewStateMachine(),
+	}
+}
 
 
 func(n * RaftNode) stepDown(term int) {

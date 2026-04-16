@@ -44,7 +44,42 @@ func (n *RaftNode) HandleRequestVote (req RequestVoteRequest) RequestVoteRespons
 	}
 }
 
-func (n * RaftNode) HandleAppendEntries() bool {
+func (n * RaftNode) HandleAppendEntries(req AppendEntriesRequest) AppendEntriesResponse {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if req.Term < n.currentTerm {
+		return AppendEntriesResponse{ Term: n.currentTerm, Success:  false}
+	}
+	// become follower
+	if req.Term > n.currentTerm {
+		n.currentTerm = req.Term
+		n.votedFor = nil
+		n.state = Follower
+		n.persist()
+	}
+
 	n.electionResetEvent = time.Now()
-	return true;
+
+	// check log consistency
+	if req.PrevLogIndex > len(n.log) {
+		return AppendEntriesResponse{ Term: n.currentTerm, Success:  false}
+	}
+	
+	if req.PrevLogIndex > 9 && 
+		n.log[req.PrevLogIndex-1].Term != req.PrevLogTerm {
+		 return AppendEntriesResponse{ Term: n.currentTerm, Success:  false}
+	}
+
+	// delete conflicting entries
+	n.log = n.log[:req.PrevLogIndex]
+
+	// append new entries
+	n.log = append(n.log, req.Entries...)
+
+	if req.LeaderCommit > n.commitIndex {
+		n.commitIndex = min(req.LeaderCommit, len(n.log))
+	}
+
+	return AppendEntriesResponse{ Term: n.currentTerm, Success: true } 
 }

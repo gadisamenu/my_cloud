@@ -1,11 +1,13 @@
 package raft
 
 import (
+	"fmt"
 	"math/rand"
 	"time"
 )
 
 func (n *RaftNode) startElection() {
+	n.logState("starting election")
 	n.mu.Lock()
 	n.state = Candidate
 	n.currentTerm ++
@@ -49,21 +51,23 @@ func (n *RaftNode) runElectionTimer() {
 		n.mu.Unlock()
 
 		time.Sleep(timeout);
-
 		n.mu.Lock()
+		
 
 		// if state changed ignore
 		if n.state == Leader {
+			fmt.Println(n.id, "skipping election, state changed now a leader")
 			n.mu.Unlock()
 			continue
 		}
 
 		// skip if timer was reset
 		if lastReset != n.electionResetEvent {
+			fmt.Println(n.id, "skipping election, timer was reset")
 			n.mu.Unlock()
 			continue
 		}
-
+		fmt.Println(n.id, "election timeout, starting election")
 		n.mu.Unlock()
 		n.startElection()
 	}
@@ -82,6 +86,8 @@ func (n *RaftNode) handleVoteResponse (resp RequestVoteResponse, term int) {
 
 	if resp.VoteGranted {
 		n.voteCount ++
+		fmt.Println("peers lenght", len(n.peers), "voute count", n.voteCount)
+		// majority := (len(n.peers) + 1)/2 + 1
 		if n.voteCount > len(n.peers)/2 {
 			n.becomeLeader()
 		}
@@ -90,6 +96,7 @@ func (n *RaftNode) handleVoteResponse (resp RequestVoteResponse, term int) {
 
 func(n *RaftNode) becomeLeader() {
 	n.state = Leader
+	n.logState("became leader")
 	// initialize leader sate 
 	for _, peer := range n.peers {
 		n.nextIndex[peer] = n.lastLogIndex() + 1
@@ -97,4 +104,8 @@ func(n *RaftNode) becomeLeader() {
 	}
 
 	go n.startHeartbeatLoop();
+}
+
+func (n *RaftNode) Run() {
+    go n.runElectionTimer()
 }

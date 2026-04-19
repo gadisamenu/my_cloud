@@ -2,7 +2,7 @@ package raft
 
 type RequestVoteRequest struct {
 	Term int
-	CandidateId string
+	CandidateID string
 	LastLogIndex int
 	LastLogTerm int
 }
@@ -25,5 +25,5 @@ type AppendEntriesResponse struct {
 	Term int
 	Success bool
 	ConflictIndex int
-	ConflictTerm int
+	// ConflictTerm int
 }

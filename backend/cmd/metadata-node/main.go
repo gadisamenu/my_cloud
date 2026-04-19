@@ -30,7 +30,7 @@ func main() {
 	
 	// TODO: start RPC server
     // TODO: start election loop
-
+	go node.StartHttpServer()
 	go node.Run()
     select {} // keep running
 }

@@ -8,7 +8,7 @@ func (n *RaftNode) startHeartbeatLoop() {
 	defer ticker.Stop()
 
 	for {
-		<- ticker.C
+		<-ticker.C
 
 		n.mu.Lock()
 		if n.state != Leader {
@@ -16,58 +16,52 @@ func (n *RaftNode) startHeartbeatLoop() {
 			return
 		}
 		n.mu.Unlock()
-		// n.sendHeartbeats()
+		n.sendHeartbeats()
 	}
 }
+
+// func (n *RaftNode) sendAppendEntriesToAll() {
+// 	for _, peer := range n.peers {
+// 		go func(p string) {
+
+// 			n.mu.Lock()
+
+// 			nextIdx := n.nextIndex[p]
+// 			prevIdx := nextIdx - 1
+
+// 			var prevTerm int
+// 			if prevIdx > 0 {
+// 				prevTerm = n.log[prevIdx-1].Term
+// 			}
+
+// 			entries := n.log[nextIdx-1:]
+
+// 			req := AppendEntriesRequest{
+// 				Term:         n.currentTerm,
+// 				LeaderID:     n.id,
+// 				PrevLogIndex: prevIdx,
+// 				PrevLogTerm:  prevTerm,
+// 				Entries:      entries,
+// 				LeaderCommit: n.commitIndex,
+// 			}
+
+// 			n.mu.Unlock()
+
+// 			resp := n.sendAppendEntries(p, req)
+
+// 			n.handleAppendEntriesResponse(p, resp, req)
+
+// 		}(peer)
+// 	}
+// }
 
 func (n *RaftNode) sendHeartbeats() {
 	for _,peer := range n.peers {
-		go n.replicateToPeer(peer)
+		go n.replicateToPeer(peer, nil)
 	}
 }
 
-func (n *RaftNode) handleAppendEntriesResponse(peer string, resp AppendEntriesResponse, req AppendEntriesRequest) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	if n.state != Leader { return }
-
-	if resp.Term > n.currentTerm {
-		n.stepDown(resp.Term)
-		return
-	}
-
-	if resp.Success {
-		lastSent := req.PrevLogIndex + len(req.Entries)
-		n.matchIndex[peer] = lastSent
-		n.nextIndex[peer] = lastSent + 1
-		n.updateCommitIndex()
-	} else {
-		n.nextIndex[peer]--
-		if n.nextIndex[peer] < 1 {
-			n.nextIndex[peer] = 1
-		}
-	}
-}
-
-func (n *RaftNode) updateCommitIndex() {
-	for i := n.commitIndex + 1; i <= len(n.log); i++ {
-		count := 1 //leader itself
-
-		for _, peer := range n.peers {
-			if n.matchIndex[peer] >= i {
-				count++
-			}
-		}
-
-		if count > len(n.peers)/2 && 
-			n.log[i-1].Term == n.currentTerm {
-				n.commitIndex = 1
-		}
-	}
-}
-
-func (n *RaftNode) replicateToPeer(peer string) {
+func (n *RaftNode) replicateToPeer(peer string, entries []LogEntry) {
 	n.mu.Lock()
 
 	if n.state != Leader {
@@ -81,8 +75,7 @@ func (n *RaftNode) replicateToPeer(peer string) {
 	if prevLogIndex > 0 && prevLogIndex <= len(n.log) {
 		prevLogTerm = n.log[prevLogIndex-1].Term
 	}
-
-	entries := n.log[nextIdx-1:]
+	// entries := n.log[nextIdx-1:]
 
 	req := AppendEntriesRequest {
 		Term: n.currentTerm,
@@ -98,3 +91,67 @@ func (n *RaftNode) replicateToPeer(peer string) {
 	resp := n.sendAppendEntries(peer, req)
 	n.handleAppendEntriesResponse(peer,resp, req)
 }
+
+
+func (n *RaftNode) handleAppendEntriesResponse(peer string, resp AppendEntriesResponse, req AppendEntriesRequest) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.state != Leader { return }
+
+	if resp.Term > n.currentTerm {
+		n.stepDown(resp.Term)
+		return
+	}
+
+	if resp.Success {
+		n.matchIndex[peer] = req.PrevLogIndex + len(req.Entries)
+		n.nextIndex[peer] = n.matchIndex[peer] + 1
+		n.updateCommitIndex()
+	} else {
+		// fallback to follower's known state
+		if resp.ConflictIndex != 0 {
+			n.nextIndex[peer] = resp.ConflictIndex
+		} else {
+			n.nextIndex[peer]--
+			if n.nextIndex[peer] < 1 {
+				n.nextIndex[peer] = 1
+			}
+		}
+	}
+}
+// func (n *RaftNode) updateCommitIndex() {
+// 	for i := len(n.log); i > n.commitIndex; i-- {
+
+// 		count := 1 // leader itself
+
+// 		for peer := range n.matchIndex {
+// 			if n.matchIndex[peer] >= i {
+// 				count++
+// 			}
+// 		}
+
+// 		if count >= (len(n.peers)+1)/2+1 {
+// 			n.commitIndex = i
+// 			break
+// 		}
+// 	}
+// }
+
+func (n *RaftNode) updateCommitIndex() {
+	for i := n.commitIndex + 1; i <= len(n.log); i++ {
+		count := 1 //leader itself
+
+		for _, peer := range n.peers {
+			if n.matchIndex[peer] >= i {
+				count++
+			}
+		}
+
+		if count >= (len(n.peers)+1)/2+1 &&
+		 	n.log[i-1].Term == n.currentTerm {
+				n.commitIndex = i
+		}
+	}
+}
+

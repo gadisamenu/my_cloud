@@ -20,21 +20,50 @@ func (n *RaftNode) startElection() {
 	term := n.currentTerm
 	lastIndex := n.lastLogIndex()
 	lastTerm := n.lastLogTerm()
+	majority := (len(n.peers)+1)/2 + 1
 
 	n.mu.Unlock()
 
 
 	for _, peer := range n.peers {
+
 		go func(peer string) {
 			resp := n.sendRequestVote(peer, RequestVoteRequest{
-				Term: term,
-				CandidateId: n.id,
+				Term:         term,
+				CandidateID:  n.id,
 				LastLogIndex: lastIndex,
-				LastLogTerm: lastTerm,
+				LastLogTerm:  lastTerm,
 			})
 
-			n.handleVoteResponse(resp, term)
-		} (peer)
+			n.mu.Lock()
+			defer n.mu.Unlock()
+
+			if n.state != Candidate || term != n.currentTerm {
+				return
+			}
+
+			if resp.Term > n.currentTerm {
+				n.stepDown(resp.Term)
+				return
+			}
+
+			if resp.VoteGranted {
+				n.voteCount++
+				if n.voteCount >= majority {
+					n.becomeLeader()
+				}
+			}
+		}(peer)
+		// go func(peer string) {
+		// 	resp := n.sendRequestVote(peer, RequestVoteRequest{
+		// 		Term: term,
+		// 		CandidateId: n.id,
+		// 		LastLogIndex: lastIndex,
+		// 		LastLogTerm: lastTerm,
+		// 	})
+
+		// 	n.handleVoteResponse(resp, term)
+		// } (peer)
 	}
 }
 
@@ -73,26 +102,26 @@ func (n *RaftNode) runElectionTimer() {
 	}
 }
 
-func (n *RaftNode) handleVoteResponse (resp RequestVoteResponse, term int) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
+// func (n *RaftNode) handleVoteResponse (resp RequestVoteResponse, term int) {
+// 	n.mu.Lock()
+// 	defer n.mu.Unlock()
 
-	if n.state != Candidate || term != n.currentTerm { return }
+// 	if n.state != Candidate || term != n.currentTerm { return }
 
-	if resp.Term > n.currentTerm {
-		n.stepDown(resp.Term)
-		return
-	}
+// 	if resp.Term > n.currentTerm {
+// 		n.stepDown(resp.Term)
+// 		return
+// 	}
 
-	if resp.VoteGranted {
-		n.voteCount ++
-		fmt.Println("peers lenght", len(n.peers), "voute count", n.voteCount)
-		// majority := (len(n.peers) + 1)/2 + 1
-		if n.voteCount > len(n.peers)/2 {
-			n.becomeLeader()
-		}
-	}
-}
+// 	if resp.VoteGranted {
+// 		n.voteCount ++
+// 		fmt.Println("peers lenght", len(n.peers), "voute count", n.voteCount)
+// 		// majority := (len(n.peers) + 1)/2 + 1
+// 		if n.voteCount > len(n.peers)/2 {
+// 			n.becomeLeader()
+// 		}
+// 	}
+// }
 
 func(n *RaftNode) becomeLeader() {
 	n.state = Leader

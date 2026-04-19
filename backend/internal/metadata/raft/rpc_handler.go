@@ -20,7 +20,7 @@ func (n *RaftNode) HandleRequestVote (req RequestVoteRequest) RequestVoteRespons
 		n.stepDown(req.Term)
 	}
 
-	if n.votedFor != nil && *n.votedFor != req.CandidateId {
+	if n.votedFor != nil && *n.votedFor != req.CandidateID {
 		return RequestVoteResponse {
 			Term: n.currentTerm,
 			VoteGranted: false,
@@ -34,7 +34,7 @@ func (n *RaftNode) HandleRequestVote (req RequestVoteRequest) RequestVoteRespons
 		}
 	}
 
-	n.votedFor = &req.CandidateId
+	n.votedFor = &req.CandidateID
 	n.electionResetEvent = time.Now()
 	n.persist()
 
@@ -56,7 +56,7 @@ func (n * RaftNode) HandleAppendEntries(req AppendEntriesRequest) AppendEntriesR
 		n.currentTerm = req.Term
 		n.votedFor = nil
 		n.state = Follower
-		n.persist()
+		// n.persist()
 	}
 
 	n.electionResetEvent = time.Now()
@@ -66,10 +66,22 @@ func (n * RaftNode) HandleAppendEntries(req AppendEntriesRequest) AppendEntriesR
 		return AppendEntriesResponse{ Term: n.currentTerm, Success:  false}
 	}
 	
-	if req.PrevLogIndex > 9 && 
+	if req.PrevLogIndex > 0 && 
 		n.log[req.PrevLogIndex-1].Term != req.PrevLogTerm {
 		 return AppendEntriesResponse{ Term: n.currentTerm, Success:  false}
 	}
+
+	// if req.PrevLogIndex > 0 {
+	// 	if len(n.log) < req.PrevLogIndex {
+	// 		return fail
+	// 	}
+
+	// 	if n.log[req.PrevLogIndex-1].Term != req.PrevLogTerm {
+	// 		// ❗ conflict detected
+	// 		n.log = n.log[:req.PrevLogIndex-1]
+	// 		return fail
+	// 	}
+	// }
 
 	// delete conflicting entries
 	n.log = n.log[:req.PrevLogIndex]

@@ -36,6 +36,7 @@ func (n *RaftNode) HandleRequestVote (req RequestVoteRequest) RequestVoteRespons
 
 	n.votedFor = &req.CandidateID
 	n.electionResetEvent = time.Now()
+	n.storage.SaveState(n.currentTerm, n.votedFor)
 	n.persist()
 
 	return RequestVoteResponse {

@@ -13,6 +13,7 @@ func (n *RaftNode) startElection() {
 	n.currentTerm ++
 	n.votedFor = &n.id
 	n.voteCount = 1;
+	n.storage.SaveState(n.currentTerm, n.votedFor)
 	n.persist()
 
 	n.electionResetEvent = time.Now();

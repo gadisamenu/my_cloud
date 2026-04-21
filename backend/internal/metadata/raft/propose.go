@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"cloud-storage/internal/metadata/raft/models"
 	statemachine "cloud-storage/internal/metadata/state_machine"
 	"errors"
 )
@@ -13,13 +14,14 @@ func (n *RaftNode) Propose(cmd statemachine.Command) error {
 		return errors.New("not a leader")
 	}
 
-	entry := LogEntry {
+	entry := models.LogEntry {
 		Term: n.currentTerm,
 		Index: len(n.log) + 1,
 		Command: statemachine.EncodeCommand(cmd),
 	}
 
 	n.log = append(n.log, entry)
+	n.storage.AppendLog([]models.LogEntry{entry})
 	n.persist()
 
 	n.mu.Unlock()

@@ -1,6 +1,9 @@
 package raft
 
-import "time"
+import (
+	"cloud-storage/internal/metadata/raft/models"
+	"time"
+)
 
 
 func (n *RaftNode) startHeartbeatLoop() {
@@ -61,7 +64,7 @@ func (n *RaftNode) sendHeartbeats() {
 	}
 }
 
-func (n *RaftNode) replicateToPeer(peer string, entries []LogEntry) {
+func (n *RaftNode) replicateToPeer(peer string, entries []models.LogEntry) {
 	n.mu.Lock()
 
 	if n.state != Leader {

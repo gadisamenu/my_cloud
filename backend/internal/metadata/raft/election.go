@@ -14,7 +14,7 @@ func (n *RaftNode) startElection() {
 	n.votedFor = &n.id
 	n.voteCount = 1;
 	n.storage.SaveState(n.currentTerm, n.votedFor)
-	n.persist()
+	// n.persist()
 
 	n.electionResetEvent = time.Now();
 
@@ -22,9 +22,12 @@ func (n *RaftNode) startElection() {
 	lastIndex := n.lastLogIndex()
 	lastTerm := n.lastLogTerm()
 	majority := (len(n.peers)+1)/2 + 1
-
 	n.mu.Unlock()
 
+	if len(n.peers) == 0 {
+		n.becomeLeader()
+		return
+	}
 
 	for _, peer := range n.peers {
 
@@ -55,16 +58,6 @@ func (n *RaftNode) startElection() {
 				}
 			}
 		}(peer)
-		// go func(peer string) {
-		// 	resp := n.sendRequestVote(peer, RequestVoteRequest{
-		// 		Term: term,
-		// 		CandidateId: n.id,
-		// 		LastLogIndex: lastIndex,
-		// 		LastLogTerm: lastTerm,
-		// 	})
-
-		// 	n.handleVoteResponse(resp, term)
-		// } (peer)
 	}
 }
 
@@ -86,46 +79,27 @@ func (n *RaftNode) runElectionTimer() {
 
 		// if state changed ignore
 		if n.state == Leader {
-			fmt.Println(n.id, "skipping election, state changed now a leader")
+			// fmt.Println(n.id, "skipping election, state changed now a leader")
 			n.mu.Unlock()
 			continue
 		}
 
 		// skip if timer was reset
 		if lastReset != n.electionResetEvent {
-			fmt.Println(n.id, "skipping election, timer was reset")
+			// fmt.Println(n.id, "skipping election, timer was reset")
 			n.mu.Unlock()
 			continue
 		}
-		fmt.Println(n.id, "election timeout, starting election")
+		fmt.Println(n.id, "timeout, starting election")
 		n.mu.Unlock()
 		n.startElection()
 	}
 }
 
-// func (n *RaftNode) handleVoteResponse (resp RequestVoteResponse, term int) {
-// 	n.mu.Lock()
-// 	defer n.mu.Unlock()
-
-// 	if n.state != Candidate || term != n.currentTerm { return }
-
-// 	if resp.Term > n.currentTerm {
-// 		n.stepDown(resp.Term)
-// 		return
-// 	}
-
-// 	if resp.VoteGranted {
-// 		n.voteCount ++
-// 		fmt.Println("peers lenght", len(n.peers), "voute count", n.voteCount)
-// 		// majority := (len(n.peers) + 1)/2 + 1
-// 		if n.voteCount > len(n.peers)/2 {
-// 			n.becomeLeader()
-// 		}
-// 	}
-// }
-
 func(n *RaftNode) becomeLeader() {
 	n.state = Leader
+	n.electionResetEvent = time.Now()
+
 	n.logState("became leader")
 	// initialize leader sate 
 	for _, peer := range n.peers {
@@ -138,4 +112,5 @@ func(n *RaftNode) becomeLeader() {
 
 func (n *RaftNode) Run() {
     go n.runElectionTimer()
+	go n.applyLoop()
 }

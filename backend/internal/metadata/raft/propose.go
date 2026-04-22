@@ -4,6 +4,7 @@ import (
 	"cloud-storage/internal/metadata/raft/models"
 	statemachine "cloud-storage/internal/metadata/state_machine"
 	"errors"
+	"fmt"
 )
 
 func (n *RaftNode) Propose(cmd statemachine.Command) error {
@@ -20,9 +21,14 @@ func (n *RaftNode) Propose(cmd statemachine.Command) error {
 		Command: statemachine.EncodeCommand(cmd),
 	}
 
+	fmt.Printf("proposed a cmd => %v", cmd)
+
 	n.log = append(n.log, entry)
 	n.storage.AppendLog([]models.LogEntry{entry})
-	n.persist()
+	
+	for _, peer := range n.peers {
+		go n.replicateToPeer(peer)
+	}
 
 	n.mu.Unlock()
 

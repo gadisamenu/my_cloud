@@ -13,10 +13,15 @@ func main() {
 	id := flag.String("id", "node1", "node ID")
 	port := flag.String("port", "5001", "port")
 	peers := flag.String("peers", "", "comma separated peers")
+	flag.Parse()
+	
 	stateFile := flag.String("stateFile", *id + "_state.json", "state file name")
 	logFile := flag.String("logFile", *id + "_log.json", "log file name")
 
 	flag.Parse()
+
+	fmt.Printf("state file for node %s is %s \n", *id, *stateFile)
+	fmt.Printf("log file for node %s is %s \n", *id, *logFile)
 
 	address := "localhost:" + *port
 
@@ -36,5 +41,6 @@ func main() {
     // TODO: start election loop
 	go node.StartHttpServer()
 	go node.Run()
+	
     select {} // keep running
 }

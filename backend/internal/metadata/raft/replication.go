@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"cloud-storage/internal/metadata/raft/models"
 	"time"
 )
 
@@ -23,48 +22,13 @@ func (n *RaftNode) startHeartbeatLoop() {
 	}
 }
 
-// func (n *RaftNode) sendAppendEntriesToAll() {
-// 	for _, peer := range n.peers {
-// 		go func(p string) {
-
-// 			n.mu.Lock()
-
-// 			nextIdx := n.nextIndex[p]
-// 			prevIdx := nextIdx - 1
-
-// 			var prevTerm int
-// 			if prevIdx > 0 {
-// 				prevTerm = n.log[prevIdx-1].Term
-// 			}
-
-// 			entries := n.log[nextIdx-1:]
-
-// 			req := AppendEntriesRequest{
-// 				Term:         n.currentTerm,
-// 				LeaderID:     n.id,
-// 				PrevLogIndex: prevIdx,
-// 				PrevLogTerm:  prevTerm,
-// 				Entries:      entries,
-// 				LeaderCommit: n.commitIndex,
-// 			}
-
-// 			n.mu.Unlock()
-
-// 			resp := n.sendAppendEntries(p, req)
-
-// 			n.handleAppendEntriesResponse(p, resp, req)
-
-// 		}(peer)
-// 	}
-// }
-
 func (n *RaftNode) sendHeartbeats() {
 	for _,peer := range n.peers {
-		go n.replicateToPeer(peer, nil)
+		go n.replicateToPeer(peer)
 	}
 }
 
-func (n *RaftNode) replicateToPeer(peer string, entries []models.LogEntry) {
+func (n *RaftNode) replicateToPeer(peer string) {
 	n.mu.Lock()
 
 	if n.state != Leader {
@@ -78,7 +42,8 @@ func (n *RaftNode) replicateToPeer(peer string, entries []models.LogEntry) {
 	if prevLogIndex > 0 && prevLogIndex <= len(n.log) {
 		prevLogTerm = n.log[prevLogIndex-1].Term
 	}
-	// entries := n.log[nextIdx-1:]
+	
+	entries := n.log[nextIdx-1:]
 
 	req := AppendEntriesRequest {
 		Term: n.currentTerm,
@@ -123,23 +88,6 @@ func (n *RaftNode) handleAppendEntriesResponse(peer string, resp AppendEntriesRe
 		}
 	}
 }
-// func (n *RaftNode) updateCommitIndex() {
-// 	for i := len(n.log); i > n.commitIndex; i-- {
-
-// 		count := 1 // leader itself
-
-// 		for peer := range n.matchIndex {
-// 			if n.matchIndex[peer] >= i {
-// 				count++
-// 			}
-// 		}
-
-// 		if count >= (len(n.peers)+1)/2+1 {
-// 			n.commitIndex = i
-// 			break
-// 		}
-// 	}
-// }
 
 func (n *RaftNode) updateCommitIndex() {
 	for i := n.commitIndex + 1; i <= len(n.log); i++ {

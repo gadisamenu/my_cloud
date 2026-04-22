@@ -66,7 +66,8 @@ func(n * RaftNode) stepDown(term int) {
 	n.currentTerm = term
 	n.votedFor = nil
 	n.state = Follower
-	n.persist();
+	n.storage.SaveState(n.currentTerm, n.votedFor)
+	// n.persist();
 }
 
 func (n *RaftNode) logState(msg string) {

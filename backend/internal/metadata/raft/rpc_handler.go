@@ -1,6 +1,8 @@
 package raft
 
-import "time"
+import (
+	"time"
+)
 
 
 func (n *RaftNode) HandleRequestVote (req RequestVoteRequest) RequestVoteResponse {
@@ -37,7 +39,7 @@ func (n *RaftNode) HandleRequestVote (req RequestVoteRequest) RequestVoteRespons
 	n.votedFor = &req.CandidateID
 	n.electionResetEvent = time.Now()
 	n.storage.SaveState(n.currentTerm, n.votedFor)
-	n.persist()
+	// n.persist()
 
 	return RequestVoteResponse {
 		Term: n.currentTerm,
@@ -57,6 +59,7 @@ func (n * RaftNode) HandleAppendEntries(req AppendEntriesRequest) AppendEntriesR
 		n.currentTerm = req.Term
 		n.votedFor = nil
 		n.state = Follower
+		n.storage.SaveState(n.currentTerm, n.votedFor)
 		// n.persist()
 	}
 
@@ -72,23 +75,32 @@ func (n * RaftNode) HandleAppendEntries(req AppendEntriesRequest) AppendEntriesR
 		 return AppendEntriesResponse{ Term: n.currentTerm, Success:  false}
 	}
 
-	// if req.PrevLogIndex > 0 {
-	// 	if len(n.log) < req.PrevLogIndex {
-	// 		return fail
-	// 	}
+	// find first mismatch
+	i := 0
+	for ; i < len(req.Entries); i++ {
+		idx := req.PrevLogIndex + 1 + i
 
-	// 	if n.log[req.PrevLogIndex-1].Term != req.PrevLogTerm {
-	// 		// ❗ conflict detected
-	// 		n.log = n.log[:req.PrevLogIndex-1]
-	// 		return fail
-	// 	}
-	// }
+		if idx > len(n.log) {
+			break
+		}
 
-	// delete conflicting entries
-	n.log = n.log[:req.PrevLogIndex]
+		if n.log[idx-1].Term != req.Entries[i].Term {
+			break
+		}
+	}
 
-	// append new entries
-	n.log = append(n.log, req.Entries...)
+	// truncate conflicting suffix
+	truncateIndex := req.PrevLogIndex + i
+	if truncateIndex < len(n.log) {
+		n.log = n.log[:truncateIndex]
+	}
+
+	// append only NEW entries
+	newEntries := req.Entries[i:]
+	if len(newEntries) > 0 {
+		n.log = append(n.log, newEntries...)
+		n.storage.AppendLog(newEntries)
+	}
 
 	if req.LeaderCommit > n.commitIndex {
 		n.commitIndex = min(req.LeaderCommit, len(n.log))

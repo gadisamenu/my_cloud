@@ -93,6 +93,7 @@ func (n * RaftNode) HandleAppendEntries(req AppendEntriesRequest) AppendEntriesR
 	truncateIndex := req.PrevLogIndex + i
 	if truncateIndex < len(n.log) {
 		n.log = n.log[:truncateIndex]
+		n.storage.RewriteLog(n.log)
 	}
 
 	// append only NEW entries

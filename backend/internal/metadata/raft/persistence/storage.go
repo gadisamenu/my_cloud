@@ -7,4 +7,5 @@ type Storage interface {
 	LoadState()(int, *string, error)
 	AppendLog(entries []models.LogEntry) error
 	LoadLog()([]models.LogEntry, error)
+	RewriteLog([]models.LogEntry) error
 }

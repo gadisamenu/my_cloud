@@ -72,3 +72,18 @@ func (s *DiskStorage)LoadLog()([]models.LogEntry, error) {
 	}
 	return logs, nil
 }
+
+func (s *DiskStorage)RewriteLog(logs []models.LogEntry) error {
+	f, err := os.Create(s.logFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	for _, entry := range logs {
+		data,_ := json.Marshal(entry)
+		f.Write(append(data,'\n'))
+	}
+
+	return f.Sync()
+}

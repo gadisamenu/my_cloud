@@ -3,6 +3,7 @@ package raft
 import (
 	"cloud-storage/internal/metadata/raft/models"
 	"cloud-storage/internal/metadata/raft/persistence"
+	"cloud-storage/internal/metadata/snapshot"
 	statemachine "cloud-storage/internal/metadata/state_machine"
 	"fmt"
 	"sync"
@@ -24,6 +25,9 @@ type RaftNode struct {
 
 	commitIndex int
 	lastApplied int
+	
+	lastIncludedIndex int
+	lastIncludedTerm int
 	
 	nextIndex map[string]int
 	matchIndex map[string]int
@@ -49,6 +53,16 @@ func NewRaftNode(id string, address string, peers []string, storage persistence.
 	}
 
 	node.recoverState()
+
+	snap, err := node.storage.LoadSnapshot()
+	if snap != nil && err == nil {
+		node.lastIncludedIndex = snap.LastIncludedIndex
+		node.lastIncludedTerm = snap.LastIncludedTerm
+
+		node.stateMachine.Restore(snap.Data)
+		node.commitIndex = snap.LastIncludedIndex
+		node.lastApplied = snap.LastIncludedIndex
+	}
 
 	return node
 }
@@ -86,7 +100,7 @@ func (n *RaftNode) lastLogTerm() int {
 	if len(n.log) == 0 {
 		return 0
 	}
-	return n.log[len(n.log)-1].Index
+	return n.log[len(n.log)-1].Term
 }
 
 func (n *RaftNode)isLogUpToDate(lastIndex int, lastTerm int) bool {
@@ -108,4 +122,35 @@ func (n *RaftNode) recoverState() {
 	if err == nil {
 		n.log = logs
 	}
+}
+
+func (n *RaftNode) maybeSnapshot() {
+	if n.commitIndex - n.lastIncludedIndex < 5  {
+		return
+	}
+
+	data := n.stateMachine.Snapshot();
+
+	snap := snapshot.Snapshot {
+		LastIncludedIndex: n.commitIndex,
+		LastIncludedTerm: n.getLogTerm(n.commitIndex),
+		Data: data,
+	}
+
+	n.storage.SaveSnapshot(snap)
+
+	// truncate log
+	offset := n.commitIndex - n.lastIncludedIndex
+	n.log = n.log[offset:]
+
+	n.lastIncludedIndex = snap.LastIncludedIndex
+	n.lastIncludedTerm = snap.LastIncludedTerm
+}
+
+func (n *RaftNode) getLogTerm(index int) int {
+	if index == n.lastIncludedIndex {
+		return n.lastIncludedTerm
+	}
+
+	return n.log[index-n.lastIncludedIndex-1].Term
 }

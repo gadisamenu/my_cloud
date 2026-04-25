@@ -65,13 +65,18 @@ func (n * RaftNode) HandleAppendEntries(req AppendEntriesRequest) AppendEntriesR
 
 	n.electionResetEvent = time.Now()
 
+	if req.PrevLogIndex < n.lastIncludedIndex {
+		// leader is too far behind
+		return AppendEntriesResponse{Success: false}
+	}
+
 	// check log consistency
 	if req.PrevLogIndex > len(n.log) {
 		return AppendEntriesResponse{ Term: n.currentTerm, Success:  false}
 	}
 	
 	if req.PrevLogIndex > 0 && 
-		n.log[req.PrevLogIndex-1].Term != req.PrevLogTerm {
+		n.getLogTerm(req.PrevLogIndex) != req.PrevLogTerm {
 		 return AppendEntriesResponse{ Term: n.currentTerm, Success:  false}
 	}
 
@@ -84,7 +89,7 @@ func (n * RaftNode) HandleAppendEntries(req AppendEntriesRequest) AppendEntriesR
 			break
 		}
 
-		if n.log[idx-1].Term != req.Entries[i].Term {
+		if n.getLogTerm(idx) != req.Entries[i].Term {
 			break
 		}
 	}

@@ -22,7 +22,9 @@ func (n *RaftNode) applyLoop() {
 		}
 
 		n.mu.Unlock()
-
+		if n.lastApplied % 5 == 0 {
+			n.maybeSnapshot()
+		}
 		time.Sleep(10 * time.Millisecond)
 	}
 }

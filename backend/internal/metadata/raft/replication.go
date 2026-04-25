@@ -37,10 +37,14 @@ func (n *RaftNode) replicateToPeer(peer string) {
 	}
 	nextIdx := n.nextIndex[peer]
 	prevLogIndex := nextIdx - 1
+	
+	if nextIdx <= n.lastIncludedIndex { // later: send snapshot
+		return
+	}
 
 	var prevLogTerm int
 	if prevLogIndex > 0 && prevLogIndex <= len(n.log) {
-		prevLogTerm = n.log[prevLogIndex-1].Term
+		prevLogTerm = n.getLogTerm(prevLogIndex)
 	}
 	
 	entries := n.log[nextIdx-1:]
@@ -100,7 +104,7 @@ func (n *RaftNode) updateCommitIndex() {
 		}
 
 		if count >= (len(n.peers)+1)/2+1 &&
-		 	n.log[i-1].Term == n.currentTerm {
+		 	n.getLogTerm(i) == n.currentTerm {
 				n.commitIndex = i
 		}
 	}

@@ -3,6 +3,7 @@ package persistence
 import (
 	"bytes"
 	"cloud-storage/internal/metadata/raft/models"
+	"cloud-storage/internal/metadata/snapshot"
 	"encoding/json"
 	"os"
 )
@@ -51,7 +52,7 @@ func (s *DiskStorage) AppendLog(entries []models.LogEntry) error {
 	return f.Sync()
 }
 
-func (s *DiskStorage)LoadLog()([]models.LogEntry, error) {
+func (s *DiskStorage) LoadLog()([]models.LogEntry, error) {
 	data, err := os.ReadFile(s.logFile)
 	if err != nil {
 		return nil, err
@@ -73,7 +74,7 @@ func (s *DiskStorage)LoadLog()([]models.LogEntry, error) {
 	return logs, nil
 }
 
-func (s *DiskStorage)RewriteLog(logs []models.LogEntry) error {
+func (s *DiskStorage) RewriteLog(logs []models.LogEntry) error {
 	f, err := os.Create(s.logFile)
 	if err != nil {
 		return err
@@ -86,4 +87,25 @@ func (s *DiskStorage)RewriteLog(logs []models.LogEntry) error {
 	}
 
 	return f.Sync()
+}
+
+func (s *DiskStorage) SaveSnapshot(snapshot snapshot.Snapshot) error {
+	f, err := os.OpenFile(s.snapshotFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	return json.NewEncoder(f).Encode(snapshot)
+}
+
+func (s *DiskStorage) LoadSnapshot()(*snapshot.Snapshot, error) {
+	data, err := os.ReadFile(s.snapshotFile)
+	if err != nil {
+		return nil, err
+	}
+
+	var snapshot snapshot.Snapshot
+	json.Unmarshal(data, &snapshot)
+	return &snapshot, err
 }

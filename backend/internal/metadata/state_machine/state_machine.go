@@ -40,3 +40,11 @@ func (sm *StateMachine) Apply(cmd Command) error {
 
 	return nil
 }
+
+func (sm *StateMachine) Snapshot() []byte {
+	data, _ := json.Marshal(sm.files)
+	return data
+}
+func (sm *StateMachine) Restore(data []byte) {
+	json.Unmarshal(data, &sm.files)
+}

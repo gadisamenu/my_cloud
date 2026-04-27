@@ -15,13 +15,15 @@ func main() {
 	peers := flag.String("peers", "", "comma separated peers")
 	flag.Parse()
 	
-	stateFile := flag.String("stateFile", *id + "_state.json", "state file name")
-	logFile := flag.String("logFile", *id + "_log.json", "log file name")
+	stateFile := flag.String("stateFile", *id + "_state.jsonl", "state file name")
+	logFile := flag.String("logFile", *id + "_log.jsonl", "log file name")
+	snapshotFile := flag.String("snapshotFile", *id + "_snapshot.jsonl", "snapshot file name")
 
 	flag.Parse()
 
 	fmt.Printf("state file for node %s is %s \n", *id, *stateFile)
 	fmt.Printf("log file for node %s is %s \n", *id, *logFile)
+	fmt.Printf("snapshot file for node %s is %s \n", *id, *snapshotFile)
 
 	address := "localhost:" + *port
 
@@ -30,7 +32,7 @@ func main() {
 		peerList = strings.Split(*peers, ",")
 	}
 
-	storage := persistence.NewDistStorage(*logFile, *stateFile)
+	storage := persistence.NewDistStorage(*logFile, *stateFile, *snapshotFile)
 
 	node := raft.NewRaftNode(*id, address, peerList, storage);
 

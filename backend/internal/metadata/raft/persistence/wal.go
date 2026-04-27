@@ -6,9 +6,10 @@ type DiskStorage struct {
 	snapshotFile string
 }
 
-func NewDistStorage(logFile string, stateFile string) *DiskStorage {
+func NewDistStorage(logFile string, stateFile string, snapshotFile string) *DiskStorage {
 	return &DiskStorage{
 		logFile: logFile,
 		stateFile: stateFile,
+		snapshotFile: snapshotFile,
 	}
 }

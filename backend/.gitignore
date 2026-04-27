@@ -29,6 +29,11 @@ go.work.sum
 Thumbs.db
 
 # log and state files
+localdata/**
 *_log.json
 *_state.json
+*_snapshot.json
+*_log.jsonl
+*_state.jsonl
+*_snapshot.jsonl
 

@@ -154,3 +154,12 @@ func (n *RaftNode) getLogTerm(index int) int {
 
 	return n.log[index-n.lastIncludedIndex-1].Term
 }
+
+func (n *RaftNode) canSnapshot() bool {
+	for _, peer := range n.peers {
+		if n.matchIndex[peer] < n.commitIndex {
+			return false
+		}
+	}
+	return true
+}

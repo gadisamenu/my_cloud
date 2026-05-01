@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -38,16 +39,17 @@ func (n *RaftNode) replicateToPeer(peer string) {
 	nextIdx := n.nextIndex[peer]
 	prevLogIndex := nextIdx - 1
 	
-	if nextIdx <= n.lastIncludedIndex { // later: send snapshot
+	if nextIdx <= n.lastIncludedIndex { // follower is too far behind → needs snapshot (later)
+		fmt.Printf("follower %s is too far behind nextIndex: %d,lastIncludedIndex: %d \n",peer, nextIdx, n.lastIncludedIndex)
+		n.mu.Unlock()
 		return
 	}
 
-	var prevLogTerm int
-	if prevLogIndex > 0 && prevLogIndex <= len(n.log) {
-		prevLogTerm = n.getLogTerm(prevLogIndex)
-	}
-	
-	entries := n.log[nextIdx-1:]
+	prevLogTerm := n.getLogTerm(prevLogIndex)
+
+	start := max(0, nextIdx - n.lastIncludedIndex - 1)
+
+	entries := n.log[start:]
 
 	req := AppendEntriesRequest {
 		Term: n.currentTerm,
@@ -82,20 +84,24 @@ func (n *RaftNode) handleAppendEntriesResponse(peer string, resp AppendEntriesRe
 		n.updateCommitIndex()
 	} else {
 		// fallback to follower's known state
+		minIndex := n.lastIncludedIndex + 1
+
 		if resp.ConflictIndex != 0 {
-			n.nextIndex[peer] = resp.ConflictIndex
+			n.nextIndex[peer] = max(minIndex, resp.ConflictIndex)
 		} else {
 			n.nextIndex[peer]--
-			if n.nextIndex[peer] < 1 {
-				n.nextIndex[peer] = 1
+			if n.nextIndex[peer] < minIndex {
+				n.nextIndex[peer] = minIndex
 			}
 		}
 	}
 }
 
 func (n *RaftNode) updateCommitIndex() {
-	for i := n.commitIndex + 1; i <= len(n.log); i++ {
-		count := 1 //leader itself
+	lastIndex := n.lastLogIndex()
+
+	for i := n.commitIndex + 1; i <= lastIndex; i++ {
+		count := 1
 
 		for _, peer := range n.peers {
 			if n.matchIndex[peer] >= i {
@@ -104,8 +110,8 @@ func (n *RaftNode) updateCommitIndex() {
 		}
 
 		if count >= (len(n.peers)+1)/2+1 &&
-		 	n.getLogTerm(i) == n.currentTerm {
-				n.commitIndex = i
+			n.getLogTerm(i) == n.currentTerm {
+			n.commitIndex = i
 		}
 	}
 }

@@ -26,11 +26,12 @@ func (n *RaftNode) Propose(cmd statemachine.Command) error {
 	n.log = append(n.log, entry)
 	n.storage.AppendLog([]models.LogEntry{entry})
 	
-	for _, peer := range n.peers {
-		go n.replicateToPeer(peer)
-	}
+	peers := append([]string{}, n.peers...)
 
 	n.mu.Unlock()
 
+	for _, peer := range peers {
+		go n.replicateToPeer(peer)
+	}
 	return nil
 }

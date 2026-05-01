@@ -81,6 +81,8 @@ func(n * RaftNode) stepDown(term int) {
 	n.votedFor = nil
 	n.state = Follower
 	n.storage.SaveState(n.currentTerm, n.votedFor)
+
+	n.electionResetEvent = time.Now()
 	// n.persist();
 }
 
@@ -91,19 +93,19 @@ func (n *RaftNode) logState(msg string) {
 
 func (n *RaftNode) lastLogIndex() int {
 	if len(n.log) == 0 {
-		return 0
+		return n.lastIncludedIndex
 	}
-	return n.log[len(n.log) - 1].Index
+	return n.log[len(n.log)-1].Index
 }
 
 func (n *RaftNode) lastLogTerm() int {
 	if len(n.log) == 0 {
-		return 0
+		return n.lastIncludedTerm
 	}
 	return n.log[len(n.log)-1].Term
 }
 
-func (n *RaftNode)isLogUpToDate(lastIndex int, lastTerm int) bool {
+func (n *RaftNode) isLogUpToDate(lastIndex int, lastTerm int) bool {
 	if lastTerm > n.lastLogTerm() { return true }
 	if lastTerm == n.lastLogTerm() && lastIndex >= n.lastLogIndex() {
 		return true
@@ -151,8 +153,12 @@ func (n *RaftNode) getLogTerm(index int) int {
 	if index == n.lastIncludedIndex {
 		return n.lastIncludedTerm
 	}
+	
+	if index < n.lastIncludedIndex || index > n.lastLogIndex() {
+		return 0
+	}
 
-	return n.log[index-n.lastIncludedIndex-1].Term
+	return n.log[index - n.lastIncludedIndex - 1].Term
 }
 
 func (n *RaftNode) canSnapshot() bool {
